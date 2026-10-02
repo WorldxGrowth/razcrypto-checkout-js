@@ -54,4 +54,14 @@ describe('checkout.js', () => {
     (document.querySelector('button') as HTMLButtonElement).click();
     expect(frame()?.src).toContain('/l/AbCdEf12');
   });
+
+  it('checkout_url works without a key (token stays out of the merchant page code)', () => {
+    open({ checkout_url: 'https://pay.example/pay_3fK9sQ2mZt7LxR1aPq0B?t=ct_abc' });
+    const src = new URL(frame()!.src);
+    expect(src.origin + src.pathname).toBe('https://pay.example/embed/pay_3fK9sQ2mZt7LxR1aPq0B');
+    expect(src.searchParams.get('t')).toBe('ct_abc');
+    const onError = vi.fn();
+    open({ checkout_url: 'https://pay.example/whatever', onError });
+    expect(onError).toHaveBeenCalledWith(expect.objectContaining({ code: 'invalid_checkout_url' }));
+  });
 });

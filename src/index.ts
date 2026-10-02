@@ -18,10 +18,12 @@ export interface CheckoutError {
 }
 
 export interface CheckoutOptions {
-  /** Publishable key (pk_live_… / pk_test_…). Never a secret key. */
-  key: string;
-  /** Payment created on your server (`pay_…`). */
-  payment_id: string;
+  /** Publishable key (pk_live_… / pk_test_…). Never a secret key. Not needed with `checkout_url`. */
+  key?: string;
+  /** Payment created on your server (`pay_…`). Not needed with `checkout_url`. */
+  payment_id?: string;
+  /** Alternative to key + payment_id: the `checkout_url` your server got when creating the payment. */
+  checkout_url?: string;
   onSuccess?(res: CheckoutResult): void;
   onPending?(res: { payment_id: string; status: string }): void;
   onClose?(): void;
@@ -133,10 +135,24 @@ function hostOf(opt?: string): string {
 /** Open checkout for a payment your server created. */
 export function open(options: CheckoutOptions): CheckoutHandle {
   if (typeof window === 'undefined') return fail(options?.onError, 'browser_only', 'RazCrypto.open() runs in the browser');
-  if (!options || typeof options.key !== 'string' || !/^pk_(live|test)_/.test(options.key)) {
+  if (options?.checkout_url) {
+    let u: URL;
+    try {
+      u = new URL(options.checkout_url);
+    } catch {
+      return fail(options.onError, 'invalid_checkout_url', 'checkout_url is not a valid URL');
+    }
+    const id = u.pathname.split('/').filter(Boolean).pop() ?? '';
+    const t = u.searchParams.get('t');
+    if (!PAY_ID.test(id) || !t) return fail(options.onError, 'invalid_checkout_url', 'checkout_url must be the URL returned when the payment was created');
+    const q = new URLSearchParams({ t, origin: window.location.origin });
+    if (options.locale) q.set('locale', options.locale);
+    return mount(`${u.origin}/embed/${id}?${q}`, u.origin, options);
+  }
+  if (typeof options?.key !== 'string' || !/^pk_(live|test)_/.test(options.key)) {
     return fail(options?.onError, 'invalid_key', 'Pass your publishable key (pk_live_… or pk_test_…). Never use a secret key in the browser.');
   }
-  if (!PAY_ID.test(options.payment_id)) return fail(options.onError, 'invalid_payment_id', 'payment_id must look like pay_…');
+  if (!PAY_ID.test(options.payment_id ?? '')) return fail(options.onError, 'invalid_payment_id', 'payment_id must look like pay_…');
   const host = hostOf(options.payHost);
   const q = new URLSearchParams({ key: options.key, origin: window.location.origin });
   if (options.locale) q.set('locale', options.locale);
