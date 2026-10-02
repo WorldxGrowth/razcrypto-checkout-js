@@ -141,6 +141,18 @@ function mount(src: string, payOrigin: string, handlers: { onSuccess?: (r: Check
   const splash = doc.createElement('div');
   splash.className = 'rzc-splash';
   splash.innerHTML = SPLASH_SVG + '<span>Secure crypto checkout</span>';
+  // The platform's own logo (Admin → Branding) replaces the shield once it loads; 404 keeps the shield.
+  const logo = doc.createElement('img');
+  logo.alt = '';
+  logo.width = 80;
+  logo.height = 80;
+  logo.style.cssText = 'display:none;width:80px;height:80px;object-fit:contain;border-radius:18px;animation:rzc-pulse 1.2s ease-in-out infinite';
+  logo.onload = () => {
+    splash.querySelector('svg')?.remove();
+    logo.style.display = 'block';
+  };
+  logo.src = `${payOrigin}/v1/brand-logo`;
+  splash.prepend(logo);
   const frame = doc.createElement('iframe');
   frame.src = src;
   frame.title = 'Crypto checkout';
