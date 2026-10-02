@@ -1,9 +1,9 @@
 // @vitest-environment jsdom
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { bindButtons, open, openButton } from '../src/index';
+import { bindButtons, open, openButton, preload } from '../src/index';
 
 const PAY = 'https://pay.example';
-const frame = () => document.querySelector('iframe');
+const frame = () => document.querySelector<HTMLIFrameElement>('.rzc-box iframe');
 afterEach(() => {
   document.body.innerHTML = '';
 });
@@ -63,5 +63,27 @@ describe('checkout.js', () => {
     const onError = vi.fn();
     open({ checkout_url: 'https://pay.example/whatever', onError });
     expect(onError).toHaveBeenCalledWith(expect.objectContaining({ code: 'invalid_checkout_url' }));
+  });
+
+  it('shows a splash until ready, then closes quietly after success (no onClose)', async () => {
+    const onSuccess = vi.fn();
+    const onClose = vi.fn();
+    open({ key: 'pk_test_abc', payment_id: 'pay_3fK9sQ2mZt7LxR1aPq0B', payHost: PAY, onSuccess, onClose });
+    expect(document.querySelector('.rzc-splash')).not.toBeNull();
+    expect(frame()!.style.opacity).toBe('0');
+    fromFrame({ source: 'razcrypto', type: 'ready', payload: {} });
+    expect(frame()!.style.opacity).toBe('1');
+    fromFrame({ source: 'razcrypto', type: 'success', payload: { payment_id: 'p', status: 'paid' } });
+    fromFrame({ source: 'razcrypto', type: 'done', payload: {} });
+    await new Promise((r) => setTimeout(r, 300));
+    expect(onSuccess).toHaveBeenCalledOnce();
+    expect(onClose).not.toHaveBeenCalled();
+    expect(document.querySelector('.rzc-box')).toBeNull();
+  });
+
+  it('preload adds a preconnect once', () => {
+    preload({ payHost: PAY });
+    preload({ payHost: PAY });
+    expect(document.querySelectorAll(`link[rel="preconnect"][href="${PAY}"]`)).toHaveLength(1);
   });
 });

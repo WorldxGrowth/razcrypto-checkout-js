@@ -33,6 +33,11 @@ export interface CheckoutOptions {
   payHost?: string;
 }
 
+export interface PreloadOptions {
+  /** Self-hosters only. Default: the origin this script was loaded from. */
+  payHost?: string;
+}
+
 export interface ButtonOptions {
   /** Payment button id (the link slug from your dashboard). */
   button: string;
@@ -67,6 +72,7 @@ function scriptHost(): string | null {
   return null;
 }
 const LOADED_FROM = scriptHost();
+const PRELOAD = typeof document === 'undefined' || (document.currentScript as HTMLScriptElement | null)?.dataset.preload !== 'false';
 
 let active: { close: (notify: boolean) => void } | null = null;
 
@@ -76,34 +82,94 @@ function fail(onError: ((e: CheckoutError) => void) | undefined, code: string, m
   return { close() {} };
 }
 
+const SPLASH_SVG =
+  '<svg viewBox="0 0 64 72" width="72" height="80" aria-hidden="true"><defs><linearGradient id="rzg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#5b7cfa"/><stop offset="1" stop-color="#2140c9"/></linearGradient></defs><path d="M32 2 60 12v22c0 18-12 30-28 36C16 64 4 52 4 34V12Z" fill="url(#rzg)"/><path d="m21 36 8 8 15-16" fill="none" stroke="#fff" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+
+function injectStyles(doc: Document): void {
+  if (doc.getElementById('razcrypto-css')) return;
+  const st = doc.createElement('style');
+  st.id = 'razcrypto-css';
+  st.textContent =
+    '@keyframes rzc-pulse{0%,100%{transform:scale(1);opacity:1}50%{transform:scale(.92);opacity:.75}}' +
+    '@keyframes rzc-in{from{transform:translateY(16px) scale(.98);opacity:0}to{transform:none;opacity:1}}' +
+    '.rzc-box{position:relative;overflow:hidden;background:#f4f5f7;animation:rzc-in .28s cubic-bezier(.2,.7,.2,1) both}' +
+    '.rzc-splash{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:18px;transition:opacity .25s ease;font:500 13px system-ui,sans-serif;color:#6b7280}' +
+    '.rzc-splash svg{animation:rzc-pulse 1.2s ease-in-out infinite}' +
+    '@media (prefers-reduced-motion:reduce){.rzc-box,.rzc-splash svg{animation:none}}' +
+    '@media (prefers-color-scheme:dark){.rzc-box{background:#14161b}.rzc-splash{color:#9ca3af}}';
+  doc.head.appendChild(st);
+}
+
+/** Warm the pay host once per page (DNS/TLS + the checkout window's code), so open() feels instant. */
+let warmed = false;
+function warm(host: string): void {
+  if (warmed || typeof document === 'undefined') return;
+  warmed = true;
+  const doc = document;
+  const pre = doc.createElement('link');
+  pre.rel = 'preconnect';
+  pre.href = host;
+  doc.head.appendChild(pre);
+  const idle = (cb: () => void) => ('requestIdleCallback' in window ? (window as unknown as { requestIdleCallback(c: () => void, o: { timeout: number }): void }).requestIdleCallback(cb, { timeout: 4000 }) : setTimeout(cb, 1500));
+  idle(() => {
+    const f = doc.createElement('iframe');
+    f.src = `${host}/embed/warm`;
+    f.title = '';
+    f.setAttribute('aria-hidden', 'true');
+    f.tabIndex = -1;
+    f.style.cssText = 'position:absolute;width:1px;height:1px;left:-9999px;top:0;border:0;opacity:0;pointer-events:none';
+    f.onload = () => setTimeout(() => f.remove(), 3000);
+    doc.body.appendChild(f);
+  });
+}
+
 function mount(src: string, payOrigin: string, handlers: { onSuccess?: (r: CheckoutResult) => void; onPending?: (r: { payment_id: string; status: string }) => void; onClose?: () => void }): CheckoutHandle {
   active?.close(false);
   const doc = document;
+  injectStyles(doc);
   const prevOverflow = doc.documentElement.style.overflow;
   const overlay = doc.createElement('div');
   overlay.setAttribute('role', 'dialog');
   overlay.setAttribute('aria-modal', 'true');
   overlay.setAttribute('aria-label', 'Crypto checkout');
-  overlay.style.cssText = 'position:fixed;inset:0;z-index:2147483646;display:flex;align-items:center;justify-content:center;background:rgba(15,15,20,.55);backdrop-filter:blur(2px);opacity:0;transition:opacity .2s ease';
+  overlay.style.cssText = 'position:fixed;inset:0;z-index:2147483646;display:flex;align-items:center;justify-content:center;background:rgba(15,15,20,.6);backdrop-filter:blur(3px);opacity:0;transition:opacity .2s ease';
+  const small = typeof window.matchMedia === 'function' && window.matchMedia('(max-width: 767px)').matches;
+  // The window appears instantly with a splash; the iframe fades in when it reports "ready".
+  const box = doc.createElement('div');
+  box.className = 'rzc-box';
+  box.style.cssText = small ? 'width:100%;height:100%' : 'width:880px;max-width:calc(100vw - 32px);height:min(600px,calc(100vh - 32px));border-radius:20px;box-shadow:0 24px 64px rgba(0,0,0,.35)';
+  const splash = doc.createElement('div');
+  splash.className = 'rzc-splash';
+  splash.innerHTML = SPLASH_SVG + '<span>Secure crypto checkout</span>';
   const frame = doc.createElement('iframe');
   frame.src = src;
   frame.title = 'Crypto checkout';
   frame.allow = 'clipboard-write';
-  const small = typeof window.matchMedia === 'function' && window.matchMedia('(max-width: 520px)').matches;
-  frame.style.cssText = small
-    ? 'border:0;width:100%;height:100%;background:transparent'
-    : 'border:0;width:440px;max-width:calc(100vw - 32px);height:min(760px,calc(100vh - 48px));border-radius:24px;background:transparent;box-shadow:0 24px 64px rgba(0,0,0,.35)';
-  overlay.appendChild(frame);
+  frame.style.cssText = 'position:absolute;inset:0;border:0;width:100%;height:100%;background:transparent;opacity:0;transition:opacity .25s ease';
+  box.append(splash, frame);
+  overlay.appendChild(box);
   doc.body.appendChild(overlay);
   doc.documentElement.style.overflow = 'hidden';
   requestAnimationFrame(() => (overlay.style.opacity = '1'));
+
+  const reveal = () => {
+    frame.style.opacity = '1';
+    splash.style.opacity = '0';
+    setTimeout(() => splash.remove(), 300);
+  };
+  const fallback = setTimeout(reveal, 8000);
 
   const onMessage = (e: MessageEvent) => {
     if (e.origin !== payOrigin || e.source !== frame.contentWindow) return;
     const d = e.data as { source?: string; type?: string; payload?: Record<string, unknown> } | null;
     if (!d || d.source !== 'razcrypto') return;
-    if (d.type === 'success') handlers.onSuccess?.(d.payload as unknown as CheckoutResult);
+    if (d.type === 'ready') {
+      clearTimeout(fallback);
+      reveal();
+    } else if (d.type === 'success') handlers.onSuccess?.(d.payload as unknown as CheckoutResult);
     else if (d.type === 'status' && d.payload?.status === 'confirming') handlers.onPending?.(d.payload as { payment_id: string; status: string });
+    // Paid: the success animation has played — close quietly (onSuccess already ran, so no onClose).
+    else if (d.type === 'done') close(false, true);
     else if (d.type === 'close') close(true);
   };
   const onKey = (e: KeyboardEvent) => {
@@ -112,11 +178,18 @@ function mount(src: string, payOrigin: string, handlers: { onSuccess?: (r: Check
   window.addEventListener('message', onMessage);
   window.addEventListener('keydown', onKey);
 
-  function close(notify: boolean) {
+  function close(notify: boolean, animate = false) {
+    clearTimeout(fallback);
     window.removeEventListener('message', onMessage);
     window.removeEventListener('keydown', onKey);
-    overlay.remove();
-    doc.documentElement.style.overflow = prevOverflow;
+    const finish = () => {
+      overlay.remove();
+      doc.documentElement.style.overflow = prevOverflow;
+    };
+    if (animate) {
+      overlay.style.opacity = '0';
+      setTimeout(finish, 220);
+    } else finish();
     if (active?.close === close) active = null;
     if (notify) handlers.onClose?.();
   }
@@ -168,6 +241,15 @@ export function openButton(options: ButtonOptions): CheckoutHandle {
   return mount(`${host}/l/${options.button}?${q}`, host, options);
 }
 
+/**
+ * Warm up checkout (connection + code) so open() shows the payment instantly. Called automatically when the
+ * script loads; call it yourself after loading the script dynamically. Safe to call more than once.
+ */
+export function preload(options: PreloadOptions = {}): void {
+  if (typeof window === 'undefined') return;
+  warm(hostOf(options.payHost));
+}
+
 /** Auto-wire `<button data-razcrypto-button="SLUG">` elements (no JavaScript needed on the page). */
 export function bindButtons(root: ParentNode = document): void {
   root.querySelectorAll<HTMLElement>('[data-razcrypto-button]').forEach((el) => {
@@ -181,6 +263,11 @@ export function bindButtons(root: ParentNode = document): void {
 }
 
 if (typeof document !== 'undefined') {
-  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', () => bindButtons());
-  else bindButtons();
+  const boot = () => {
+    bindButtons();
+    // Script-tag installs warm up automatically; opt out with data-preload="false" on the <script>.
+    if (LOADED_FROM && PRELOAD) preload();
+  };
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot);
+  else boot();
 }
