@@ -1,8 +1,7 @@
 {
   "name": "@razcrypto/checkout",
-  "version": "0.0.0",
-  "private": true,
-  "description": "RazCrypto Gateway browser checkout modal (checkout.js). Opens hosted checkout in an iframe; publishable key only.",
+  "version": "1.0.0",
+  "description": "RazCrypto Gateway browser checkout (checkout.js): opens hosted crypto checkout in a modal. Publishable key only.",
   "license": "MIT",
   "type": "module",
   "main": "./dist/checkout.esm.js",
@@ -14,6 +13,17 @@
     }
   },
   "files": ["dist", "README.md", "LICENSE"],
-  "sideEffects": false,
-  "keywords": ["razcrypto", "crypto", "payments", "checkout"]
+  "sideEffects": true,
+  "scripts": {
+    "build": "node build.mjs",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run"
+  },
+  "keywords": ["razcrypto", "crypto", "payments", "checkout"],
+  "devDependencies": {
+    "esbuild": "^0.25.0",
+    "jsdom": "^26.0.0",
+    "typescript": "^5.9.0",
+    "vitest": "^3.2.0"
+  }
 }
