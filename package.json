@@ -1,6 +1,6 @@
 {
   "name": "@razcrypto/checkout",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "RazCrypto Gateway browser checkout (checkout.js): opens hosted crypto checkout in a modal. Publishable key only.",
   "license": "MIT",
   "type": "module",

@@ -22,8 +22,8 @@ License: MIT. Size: about 3 KB gzip.
 </script>
 ```
 
-To pin a version with Subresource Integrity, load `/v1/checkout.1.0.0.js` instead. Add
-`integrity="<value of /v1/checkout.1.0.0.js.sri>" crossorigin="anonymous"`. The unversioned `/v1/checkout.js`
+To pin a version with Subresource Integrity, load `/v1/checkout.1.0.1.js` instead. Add
+`integrity="<value of /v1/checkout.1.0.1.js.sri>" crossorigin="anonymous"`. The unversioned `/v1/checkout.js`
 always serves the latest 1.x, so it cannot carry an integrity hash.
 
 Instead of `key` + `payment_id` you can pass the `checkout_url` your server got when it created the payment.

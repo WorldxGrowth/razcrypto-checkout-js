@@ -95,7 +95,7 @@ function injectStyles(doc: Document): void {
     '.rzc-box{position:relative;overflow:hidden;background:#f4f5f7;animation:rzc-in .28s cubic-bezier(.2,.7,.2,1) both}' +
     '.rzc-splash{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:18px;transition:opacity .25s ease;font:500 13px system-ui,sans-serif;color:#6b7280}' +
     '.rzc-splash svg{animation:rzc-pulse 1.2s ease-in-out infinite}' +
-    '@media (prefers-reduced-motion:reduce){.rzc-box,.rzc-splash svg{animation:none}}' +
+    // Splash animation plays even with reduced motion: it is short and is the brand/safety moment (D-110).
     '@media (prefers-color-scheme:dark){.rzc-box{background:#14161b}.rzc-splash{color:#9ca3af}}';
   doc.head.appendChild(st);
 }
