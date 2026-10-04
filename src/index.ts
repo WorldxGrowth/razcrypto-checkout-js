@@ -110,6 +110,8 @@ function warm(host: string): void {
   pre.rel = 'preconnect';
   pre.href = host;
   doc.head.appendChild(pre);
+  // Cache the platform logo now so the splash shows it on the first frame.
+  new Image().src = `${host}/v1/brand-logo`;
   const idle = (cb: () => void) => ('requestIdleCallback' in window ? (window as unknown as { requestIdleCallback(c: () => void, o: { timeout: number }): void }).requestIdleCallback(cb, { timeout: 4000 }) : setTimeout(cb, 1500));
   idle(() => {
     const f = doc.createElement('iframe');
@@ -140,16 +142,18 @@ function mount(src: string, payOrigin: string, handlers: { onSuccess?: (r: Check
   box.style.cssText = small ? 'width:100%;height:100%' : 'width:880px;max-width:calc(100vw - 32px);height:min(600px,calc(100vh - 32px));border-radius:20px;box-shadow:0 24px 64px rgba(0,0,0,.35)';
   const splash = doc.createElement('div');
   splash.className = 'rzc-splash';
-  splash.innerHTML = SPLASH_SVG + '<span>Secure crypto checkout</span>';
-  // The platform's own logo (Admin → Branding) replaces the shield once it loads; 404 keeps the shield.
+  splash.innerHTML = '<span>Secure crypto checkout</span>';
+  // The platform's logo (Admin → Branding; preloaded by warm()). The shield is only the fallback when there is
+  // no logo (404) — not a placeholder, so the brand is what people see first.
   const logo = doc.createElement('img');
   logo.alt = '';
   logo.width = 80;
   logo.height = 80;
-  logo.style.cssText = 'display:none;width:80px;height:80px;object-fit:contain;border-radius:18px;animation:rzc-pulse 1.2s ease-in-out infinite';
-  logo.onload = () => {
-    splash.querySelector('svg')?.remove();
-    logo.style.display = 'block';
+  logo.style.cssText = 'width:80px;height:80px;object-fit:contain;border-radius:18px;opacity:0;transition:opacity .15s ease;animation:rzc-pulse 1.2s ease-in-out infinite';
+  logo.onload = () => (logo.style.opacity = '1');
+  logo.onerror = () => {
+    logo.remove();
+    splash.insertAdjacentHTML('afterbegin', SPLASH_SVG);
   };
   logo.src = `${payOrigin}/v1/brand-logo`;
   splash.prepend(logo);
