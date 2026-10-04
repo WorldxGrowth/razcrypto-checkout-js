@@ -57,25 +57,28 @@ export interface CheckoutHandle {
 const PAY_ID = /^pay_[0-9A-Za-z]{20}$/;
 const SLUG = /^[0-9A-Za-z]{6,40}$/;
 
-/** Where this script was served from — so self-hosted copies talk to their own host. */
+/** Official RazCrypto checkout host. */
+export const DEFAULT_PAY_HOST = 'https://razcryptogateway.com';
+
+/** A gateway serving its own `/v1/checkout.js` (staging, self-hosted) — the script then uses that host. */
 function scriptHost(): string | null {
   if (typeof document === 'undefined') return null;
   const s = document.currentScript as HTMLScriptElement | null;
-  if (s?.src) {
-    try {
-      return new URL(s.src).origin;
-    } catch {
-      return null;
-    }
+  if (!s?.src) return null;
+  try {
+    const u = new URL(s.src);
+    return /\/v1\/checkout(\.\d+\.\d+\.\d+)?\.js$/.test(u.pathname) ? u.origin : null;
+  } catch {
+    return null;
   }
-  return null;
 }
 /**
- * Pay host, in this order: `payHost` option → `data-pay-host` on the <script> (bundled copies, e.g. the WordPress
- * plugin) → where the script itself was served from. No built-in domain, so moving domains needs no new release.
+ * Pay host, in this order: `payHost` option → `data-pay-host` (script or button) → the gateway the script was
+ * loaded from (`…/v1/checkout.js`) → the official host. Bundled copies (npm, WordPress plugin) use the official host.
  */
 const SCRIPT_PAY_HOST = typeof document === 'undefined' ? null : ((document.currentScript as HTMLScriptElement | null)?.dataset.payHost ?? null);
-const LOADED_FROM = SCRIPT_PAY_HOST ?? scriptHost();
+const SCRIPT_TAG_HOST = SCRIPT_PAY_HOST ?? scriptHost(); // set only when loaded with a <script> tag
+const LOADED_FROM = SCRIPT_TAG_HOST ?? DEFAULT_PAY_HOST;
 const PRELOAD = typeof document === 'undefined' || (document.currentScript as HTMLScriptElement | null)?.dataset.preload !== 'false';
 
 let active: { close: (notify: boolean) => void } | null = null;
@@ -225,7 +228,7 @@ function hostOf(opt?: string): string | null {
     return null;
   }
 }
-const NO_HOST = 'Set payHost (your gateway URL) — or open the checkout_url your server received.';
+const NO_HOST = 'payHost must be an http(s) URL.';
 
 /** Open checkout for a payment your server created. */
 export function open(options: CheckoutOptions): CheckoutHandle {
@@ -291,7 +294,7 @@ if (typeof document !== 'undefined') {
   const boot = () => {
     bindButtons();
     // Script-tag installs warm up automatically; opt out with data-preload="false" on the <script>.
-    if (LOADED_FROM && PRELOAD) preload();
+    if (SCRIPT_TAG_HOST && PRELOAD) preload(); // npm bundles call preload() themselves
   };
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot);
   else boot();

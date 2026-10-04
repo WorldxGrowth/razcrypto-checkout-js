@@ -54,9 +54,13 @@ describe('checkout.js', () => {
     (document.querySelector('button') as HTMLButtonElement).click();
     expect(frame()?.src).toContain('/l/AbCdEf12');
     expect(new URL(frame()!.src).origin).toBe(new URL(PAY).origin);
-    // No built-in domain: without payHost (and no script host) the call fails clearly instead of guessing.
+    // No payHost and not loaded from a gateway: the official host is used.
+    document.body.innerHTML = '';
+    openButton({ button: 'O7MTkxHr' });
+    expect(new URL(frame()!.src).origin).toBe('https://razcryptogateway.com');
+    // A broken payHost fails clearly.
     const onError = vi.fn();
-    openButton({ button: 'O7MTkxHr', onError });
+    openButton({ button: 'O7MTkxHr', payHost: 'not a url', onError });
     expect(onError).toHaveBeenCalledWith(expect.objectContaining({ code: 'pay_host_missing' }));
   });
 
