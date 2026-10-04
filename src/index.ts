@@ -1,6 +1,6 @@
 /**
  * @razcrypto/checkout — checkout.js. Opens RazCrypto checkout in a modal on the merchant's page.
- * Script tag: <script src="https://pay.razcryptogateway.com/v1/checkout.js"></script> → window.RazCrypto.
+ * Script tag: <script src="https://YOUR-GATEWAY/v1/checkout.js"></script> → window.RazCrypto.
  * Publishable key only. Messages are accepted only from the pay origin and only from our iframe.
  */
 
@@ -54,7 +54,6 @@ export interface CheckoutHandle {
   close(): void;
 }
 
-const DEFAULT_HOST = 'https://pay.razcryptogateway.com';
 const PAY_ID = /^pay_[0-9A-Za-z]{20}$/;
 const SLUG = /^[0-9A-Za-z]{6,40}$/;
 
@@ -71,7 +70,12 @@ function scriptHost(): string | null {
   }
   return null;
 }
-const LOADED_FROM = scriptHost();
+/**
+ * Pay host, in this order: `payHost` option → `data-pay-host` on the <script> (bundled copies, e.g. the WordPress
+ * plugin) → where the script itself was served from. No built-in domain, so moving domains needs no new release.
+ */
+const SCRIPT_PAY_HOST = typeof document === 'undefined' ? null : ((document.currentScript as HTMLScriptElement | null)?.dataset.payHost ?? null);
+const LOADED_FROM = SCRIPT_PAY_HOST ?? scriptHost();
 const PRELOAD = typeof document === 'undefined' || (document.currentScript as HTMLScriptElement | null)?.dataset.preload !== 'false';
 
 let active: { close: (notify: boolean) => void } | null = null;
@@ -213,13 +217,15 @@ function mount(src: string, payOrigin: string, handlers: { onSuccess?: (r: Check
   return { close: () => close(true) };
 }
 
-function hostOf(opt?: string): string {
+function hostOf(opt?: string): string | null {
   try {
-    return new URL(opt ?? LOADED_FROM ?? DEFAULT_HOST).origin;
+    const h = opt ?? LOADED_FROM;
+    return h ? new URL(h).origin : null;
   } catch {
-    return DEFAULT_HOST;
+    return null;
   }
 }
+const NO_HOST = 'Set payHost (your gateway URL) — or open the checkout_url your server received.';
 
 /** Open checkout for a payment your server created. */
 export function open(options: CheckoutOptions): CheckoutHandle {
@@ -243,6 +249,7 @@ export function open(options: CheckoutOptions): CheckoutHandle {
   }
   if (!PAY_ID.test(options.payment_id ?? '')) return fail(options.onError, 'invalid_payment_id', 'payment_id must look like pay_…');
   const host = hostOf(options.payHost);
+  if (!host) return fail(options.onError, 'pay_host_missing', NO_HOST);
   const q = new URLSearchParams({ key: options.key, origin: window.location.origin });
   if (options.locale) q.set('locale', options.locale);
   return mount(`${host}/embed/${options.payment_id}?${q}`, host, options);
@@ -253,6 +260,7 @@ export function openButton(options: ButtonOptions): CheckoutHandle {
   if (typeof window === 'undefined') return fail(options?.onError, 'browser_only', 'RazCrypto.openButton() runs in the browser');
   if (!options || !SLUG.test(options.button)) return fail(options?.onError, 'invalid_button', 'button must be the id shown in your dashboard');
   const host = hostOf(options.payHost);
+  if (!host) return fail(options.onError, 'pay_host_missing', NO_HOST);
   const q = new URLSearchParams({ embed: '1', origin: window.location.origin });
   return mount(`${host}/l/${options.button}?${q}`, host, options);
 }
@@ -263,7 +271,8 @@ export function openButton(options: ButtonOptions): CheckoutHandle {
  */
 export function preload(options: PreloadOptions = {}): void {
   if (typeof window === 'undefined') return;
-  warm(hostOf(options.payHost));
+  const host = hostOf(options.payHost);
+  if (host) warm(host);
 }
 
 /** Auto-wire `<button data-razcrypto-button="SLUG">` elements (no JavaScript needed on the page). */
@@ -273,7 +282,7 @@ export function bindButtons(root: ParentNode = document): void {
     el.dataset.razcryptoBound = '1';
     el.addEventListener('click', (e) => {
       e.preventDefault();
-      openButton({ button: el.dataset.razcryptoButton ?? '' });
+      openButton({ button: el.dataset.razcryptoButton ?? '', ...(el.dataset.payHost && { payHost: el.dataset.payHost }) });
     });
   });
 }

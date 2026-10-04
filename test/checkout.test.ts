@@ -49,10 +49,15 @@ describe('checkout.js', () => {
     const src = new URL(frame()!.src);
     expect(src.pathname).toBe('/l/O7MTkxHr');
     expect(src.searchParams.get('embed')).toBe('1');
-    document.body.innerHTML = '<button data-razcrypto-button="AbCdEf12">Pay</button>';
+    document.body.innerHTML = `<button data-razcrypto-button="AbCdEf12" data-pay-host="${PAY}">Pay</button>`;
     bindButtons();
     (document.querySelector('button') as HTMLButtonElement).click();
     expect(frame()?.src).toContain('/l/AbCdEf12');
+    expect(new URL(frame()!.src).origin).toBe(new URL(PAY).origin);
+    // No built-in domain: without payHost (and no script host) the call fails clearly instead of guessing.
+    const onError = vi.fn();
+    openButton({ button: 'O7MTkxHr', onError });
+    expect(onError).toHaveBeenCalledWith(expect.objectContaining({ code: 'pay_host_missing' }));
   });
 
   it('checkout_url works without a key (token stays out of the merchant page code)', () => {

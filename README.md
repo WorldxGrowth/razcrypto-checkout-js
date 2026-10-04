@@ -1,13 +1,13 @@
 # RazCrypto Checkout (`checkout.js`)
 
-A browser checkout window for your website. It is served from `https://pay.razcryptogateway.com/v1/checkout.js`
-(self-hosters: `https://<your-pay-host>/v1/checkout.js`). It is also published on npm as **`@razcrypto/checkout`**.
+A browser checkout window for your website. It is served by your gateway at `https://<your-pay-host>/v1/checkout.js`
+(the checkout host is shown in Dashboard → API apps). It is also published on npm as **`@razcrypto/checkout`**.
 License: MIT. Size: about 3 KB gzip.
 
 ## Script tag
 
 ```html
-<script src="https://pay.razcryptogateway.com/v1/checkout.js"></script>
+<script src="https://<your-pay-host>/v1/checkout.js"></script>
 <script>
   // 1. Your server creates the payment (secret key) and returns its id.
   // 2. Open checkout with your publishable key:
@@ -22,11 +22,15 @@ License: MIT. Size: about 3 KB gzip.
 </script>
 ```
 
-To pin a version with Subresource Integrity, load `/v1/checkout.1.0.2.js` instead. Add
-`integrity="<value of /v1/checkout.1.0.2.js.sri>" crossorigin="anonymous"`. The unversioned `/v1/checkout.js`
+To pin a version with Subresource Integrity, load `/v1/checkout.1.0.3.js` instead. Add
+`integrity="<value of /v1/checkout.1.0.3.js.sri>" crossorigin="anonymous"`. The unversioned `/v1/checkout.js`
 always serves the latest 1.x, so it cannot carry an integrity hash.
 
 Instead of `key` + `payment_id` you can pass the `checkout_url` your server got when it created the payment.
+
+**No built-in host.** Loaded from your gateway, the script knows its host. A bundled copy (npm, or a file on your own
+site such as the WordPress plugin) needs `payHost` in `open()` or `data-pay-host="https://<your-pay-host>"` on the
+`<script>` or button; otherwise `open()` fails with `pay_host_missing`. `checkout_url` never needs it.
 
 **Pay buttons (no code):** `<button data-razcrypto-button="BUTTON_ID">Pay</button>`. You can also call
 `RazCrypto.openButton({ button: 'BUTTON_ID' })`.
