@@ -12,18 +12,40 @@
       "import": "./dist/checkout.esm.js"
     }
   },
-  "files": ["dist", "README.md", "LICENSE"],
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
   "sideEffects": true,
   "scripts": {
     "build": "node build.mjs",
     "typecheck": "tsc --noEmit",
     "test": "vitest run"
   },
-  "keywords": ["razcrypto", "crypto", "payments", "checkout"],
+  "keywords": [
+    "razcrypto",
+    "crypto",
+    "payments",
+    "checkout",
+    "usdt",
+    "payment-gateway"
+  ],
   "devDependencies": {
     "esbuild": "^0.25.0",
     "jsdom": "^26.0.0",
     "typescript": "^5.9.0",
     "vitest": "^3.2.0"
+  },
+  "homepage": "https://razcryptogateway.com/docs/sdks",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/WorldxGrowth/razcrypto-checkout-js.git"
+  },
+  "bugs": {
+    "url": "https://github.com/WorldxGrowth/razcrypto-checkout-js/issues"
+  },
+  "publishConfig": {
+    "access": "public"
   }
 }
