@@ -19,9 +19,10 @@
   ],
   "sideEffects": true,
   "scripts": {
-    "build": "node build.mjs",
+    "build": "node build.mjs && tsc -p tsconfig.json",
     "typecheck": "tsc --noEmit",
-    "test": "vitest run"
+    "test": "vitest run",
+    "prepublishOnly": "npm run build && npm test"
   },
   "keywords": [
     "razcrypto",
